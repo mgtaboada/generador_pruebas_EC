@@ -52,17 +52,19 @@ def filtRec(img, mfiltro, nCambios, nFiltrados):
    # print("nFiltrados: "+ str(nFiltrados))
     #print("actual: ")
    # en_memoria_imagen(img)
+    aux = filtro(img, mfiltro)
+    nFiltrados = nFiltrados + 1
     if nFiltrados >= 10:
         print("nFiltrados: " + nFiltrados)
-        return img
-    aux = filtro(img, mfiltro)
+        return aux
     #print("cambiada: ")
    # en_memoria_imagen(aux)
     nuevoCambios = comp(aux, img)
     if nuevoCambios < nCambios:
         print("nFiltrados: " + str(nFiltrados))
-        return img
-    return filtRec(aux, mfiltro, nCambios, nFiltrados + 1)
+        return aux
+    return filtRec(aux, mfiltro, nCambios, nFiltrados)
+
 def to_little_endian(num):
     res = ""
     num2=num[2:]
@@ -104,10 +106,10 @@ def en_datos_filtro(mfiltro):
 
     return "data 0x"+ to_big_endian(hex(mfiltro.k))+', ' + m[:-2]
 def en_memoria_imagen(imagen):
+    total =' '+to_little_endian(hex(imagen.m)) + " "+ to_little_endian(hex(imagen.n))
     m = "0x"
-    total = ""
     con = 0
-    columnas = 0
+    columnas = 2
     for i in range(len(imagen.matriz)):
         for j in range(len(imagen.matriz[i])):
             if con == 4:
@@ -127,31 +129,66 @@ def en_memoria_imagen(imagen):
     if con != 0:
         total = total + ' '+to_little_endian(m)
 
-    return '0x'+to_little_endian(hex(imagen.m))+ " 0x"+ to_little_endian(hex(imagen.n))+ "\n"+ total
+    return total
 def en_datos_imagen(imagen):
     m = "ox"
     total = ""
     con = 0
     for i in imagen.matriz:
         for j in i:
-            if con < 4:
-                j = int(j)
-                m = m + (2-(len(hex(j))-2))*'0' +hex(j)[2:]
-                con +=1
-            else:
+            j = int(j)
+            m = m + (2-(len(hex(j))-2))*'0' +hex(j)[2:]
+            con +=1
+            if con == 4:
                 total =total+ ", 0x"+ to_big_endian(m)
                 m = "ox"
                 con = 0
 
 
     if ((imagen.n * imagen.m) % 8) != 0:
-        total = total+ " "+ to_big_endian(m)
+        total = total+ ", 0x"+ to_big_endian(m)
 
     return "data 0x"+to_big_endian(hex(imagen.m))+ ", 0x"+ to_big_endian(hex(imagen.n))+ total
-def en_datos_matriz(m):
-    return en_datos_imagen(Imagen(len(m), len(m[0]), m))
-def en_memoria_matriz(m):
-    return en_memoria_imagen(Imagen(len(m), len(m[0]), m))
+def en_datos_matriz(matriz):
+    m = "ox"
+    total = ""
+    con = 0
+    for i in matriz:
+        for j in i:
+            con += 1
+            j = int(j)
+            m = m + (2-(len(hex(j))-2))*'0' +hex(j)[2:]
+            if con == 4:
+                total =total+ " 0x"+ to_little_endian(m)+ ","
+                m = "ox"
+                con = 0
+
+    return "data "+ total+ " "+ hex(matriz[2][2])
+def en_memoria_matriz(matriz):
+    total =''
+    m = "0x"
+    con = 0
+    columnas = 2
+    for i in range(len(matriz)):
+        for j in range(len(matriz[i])):
+            if con == 4:
+                total = total + ' '+to_little_endian(m)
+                m = "0x"
+                con = 0
+                columnas +=1
+
+            m = m +(2-(len(hex(matriz[i][j]))-2))*'0' + hex(matriz[i][j])[2:]
+            con +=1
+
+
+            if columnas == 4:
+                total = total + "\n"
+                columnas = 0
+
+    if con != 0:
+        total = total + ' '+to_little_endian(m)
+
+    return total
 def datos_y_solucion_comp():
     while True:
         im1 = imagen_aleatoria()
@@ -163,12 +200,11 @@ def datos_y_solucion_comp():
 
 def datos_y_solucion_valorPixel():
     while True:
-        im = imagen_aleatoria()
-        subimg = subMatriz(im, randint(0, im.m-1), randint(0, im.n-1))
+        subimg = [[randint(0,25) for i in range(3)] for j in range(3)]
         mf = filtro_aleatorio()
-        print("SUBIMG: " + en_datos_matriz(subimg))
+        print("SUBIMAGEVP: " + en_datos_matriz(subimg))
         print("MFIL: "+ en_datos_filtro(mf))
-        print("Valor esperado para valorPixel: " + str(vPixel(subimg, mf)))
+        print(";Valor esperado para valorPixel: " + str(hex(vPixel(subimg, mf))))
         input("Pulsar Enter para obtener otro juego de valores...")
 def datos_y_solucion_subMatriz():
     while True:
@@ -176,8 +212,8 @@ def datos_y_solucion_subMatriz():
         i = randint(0, im.m-1)
         j = randint(0, im.n-1)
         print("IMG: "+ en_datos_imagen(im))
-        print("i: "+ str(i))
-        print("j: "+ str(j))
+        print("I: data"+ str(i))
+        print("J: data"+ str(j))
         print("Valor esperado para subMatriz: "+ en_memoria_matriz(subMatriz(im, i, j)))
 
         input("Pulsar Enter para obtener otro juego de valores...")
@@ -191,7 +227,7 @@ def datos_y_solucion_filPixel():
         print("MFIL: "+ en_datos_filtro(mf))
         print("i: "+ str(i))
         print("j: "+ str(j))
-        print("Valor esperado para filPixel: "+ filPixel(im, i, j, mf))
+        print("Valor esperado para filPixel: "+ str(filPixel(im, i, j, mf)))
         input("Pulsar Enter para obtener otro juego de valores...")
 def datos_y_solucion_filtro():
     while True:
@@ -208,9 +244,9 @@ def datos_y_solucion_filtrec():
         im = imagen_aleatoria()
         mf = filtro_aleatorio()
         nCambios = randint(300,10200)
-        print("IMG: " + en_datos_imagen(im))
-        print("MFIL: " + en_datos_filtro(mf))
-        print("nCambios: "+ str(nCambios))
+        print("IMGFREC: " + en_datos_imagen(im))
+        print("FILFREC: " + en_datos_filtro(mf))
+        print("NCAMBIOS: data "+ str(nCambios))
         print("\n\n\n\n")
         print("Valor esperado para la imagen tras filtrec:")
         print(en_memoria_imagen(filtRec(im,mf, nCambios, 0)))
@@ -226,4 +262,3 @@ def main():
     opcion = int(input("Introducir un número\n>>> "))
     dop = {1:datos_y_solucion_comp, 2: datos_y_solucion_valorPixel, 3: datos_y_solucion_subMatriz,4:datos_y_solucion_filPixel,5:datos_y_solucion_filtro,6:datos_y_solucion_filtrec}
     dop[opcion]()
-main()
